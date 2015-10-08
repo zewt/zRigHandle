@@ -273,8 +273,15 @@ class zRigHandleShapeUI(omui.MPxSurfaceShapeUI):
 
             item = om.MSelectionList()
             item.add(selectInfo.selectPath())
+
+            # Get the world space position of the node.  We'll set the position of the selection here,
+            # so the camera focuses on it.
+            mat = item.getDagPath(0).inclusiveMatrix()
+            transformation = om.MTransformationMatrix(mat)
+            pos = transformation.translation(om.MSpace.kWorld)
+
             priorityMask = om.MSelectionMask(om.MSelectionMask.kSelectJoints)
-            selectInfo.addSelection(item, om.MPoint(), selectionList, worldSpaceSelectPts, priorityMask, False)
+            selectInfo.addSelection(item, om.MPoint(pos), selectionList, worldSpaceSelectPts, priorityMask, False)
 
             return True
 
