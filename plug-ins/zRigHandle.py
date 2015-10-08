@@ -139,9 +139,11 @@ def _getTransform(node):
     transformPlug = om.MPlug(node, zRigHandle.transformAttr)
     transform = om.MFnMatrixData(transformPlug.asMObject()).matrix()
 
-    size = om.MPlug(node, zRigHandle.sizeAttr).asFloat()
+    sizePlug = om.MPlug(node, zRigHandle.scaleAttr)
+    size = om.MFnNumericData(sizePlug.asMObject()).getData()
+
     mat = om.MTransformationMatrix(transform)
-    mat.scaleBy((size,size,size), om.MSpace.kObject)
+    mat.scaleBy(size, om.MSpace.kObject)
 
     return mat.asMatrix()
 
@@ -173,10 +175,14 @@ class zRigHandle(om.MPxSurfaceShape):
                 cls.transformAttr = matAttr.create('transform', 't', om.MFnMatrixAttribute.kFloat)
                 cls.addAttribute(cls.transformAttr)
 
-                cls.sizeAttr = nAttr.create('size', 'sz', om.MFnNumericData.kFloat, 1)
+                scaleX = nAttr.create('sizeX', 'sx', om.MFnNumericData.kFloat, 1)
+                scaleY = nAttr.create('sizeY', 'sy', om.MFnNumericData.kFloat, 1)
+                scaleZ = nAttr.create('sizeZ', 'sz', om.MFnNumericData.kFloat, 1)
+
+                cls.scaleAttr = nAttr.create('scale', 's', scaleX, scaleY, scaleZ)
                 nAttr.channelBox = True
                 nAttr.keyable = True
-                cls.addAttribute(cls.sizeAttr)
+                cls.addAttribute(cls.scaleAttr)
 
                 cls.colorAttr = nAttr.createColor('color', 'dc')
                 nAttr.default = (.38,0,0.02)
@@ -191,7 +197,10 @@ class zRigHandle(om.MPxSurfaceShape):
                 self.isRenderable = True
 
         def setDependentsDirty(self, plug, affectedPlugs):
-                if plug in (zRigHandle.transformAttr, zRigHandle.shapeAttr, zRigHandle.sizeAttr,
+                if plug.isChild:
+                    plug = plug.parent()
+
+                if plug in (zRigHandle.transformAttr, zRigHandle.shapeAttr, zRigHandle.scaleAttr,
                     zRigHandle.colorAttr, zRigHandle.alphaAttr):
                     self.childChanged(self.kBoundingBoxChanged)
                     omr.MRenderer.setGeometryDrawDirty(self.thisMObject(), False)
