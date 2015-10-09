@@ -20,10 +20,8 @@ def maya_useNewAPI():
 
 # Be careful when changing the order of these shapes.  Their index is the value of the .shape
 # enum, so this affects the file format.
-shapes = []
-shapes.append({
-    'name': 'Pyramid',
-    'geometry': [{
+def _make_pyramid():
+    return [{
         'type': 'quad',
         'data': [
             (-0.5, -0.333, +0.5),
@@ -51,7 +49,6 @@ shapes.append({
             (+0.0, +0.666, -0.0),
         ]
     }]
-})
 
 def _make_ball():
     points = []
@@ -109,10 +106,13 @@ def _make_ball():
 
     return result
 
-shapes.append({
+shapes = [{
     'name': 'Ball',
-    'geometry': _make_ball()
-})
+    'geometry': _make_ball(),
+}, {
+    'name': 'Pyramid',
+    'geometry': _make_pyramid(),
+}]
 
 for shape in shapes:
     for item in shape['geometry']:
