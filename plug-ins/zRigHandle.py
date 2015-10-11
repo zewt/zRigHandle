@@ -139,11 +139,23 @@ def _getTransform(node):
     transformPlug = om.MPlug(node, zRigHandle.transformAttr)
     transform = om.MFnMatrixData(transformPlug.asMObject()).matrix()
 
-    sizePlug = om.MPlug(node, zRigHandle.scaleAttr)
-    size = om.MFnNumericData(sizePlug.asMObject()).getData()
-
     mat = om.MTransformationMatrix(transform)
-    mat.scaleBy(size, om.MSpace.kObject)
+
+    # Apply local translation.
+    localTranslatePlug = om.MPlug(node, zRigHandle.localTranslateAttr)
+    localTranslation = om.MVector(*[localTranslatePlug.child(idx).asFloat() for idx in range(3)])
+    mat.translateBy(localTranslation, om.MSpace.kObject)
+
+    # Apply local rotation.
+    localRotatePlug = om.MPlug(node, zRigHandle.localRotateAttr)
+    localRotatePlugs = [localRotatePlug.child(idx) for idx in range(3)]
+    localRotate = om.MVector(*[localRotatePlugs[idx].asMAngle().asRadians() for idx in range(3)])
+    mat.rotateBy(om.MEulerRotation(localRotate), om.MSpace.kObject)
+
+    # Apply local scale.
+    scalePlug = om.MPlug(node, zRigHandle.localScaleAttr)
+    scale = om.MFnNumericData(scalePlug.asMObject()).getData()
+    mat.scaleBy(scale, om.MSpace.kObject)
 
     return mat.asMatrix()
 
@@ -164,6 +176,7 @@ class zRigHandle(om.MPxSurfaceShape):
                 nAttr = om.MFnNumericAttribute()
                 enumAttr = om.MFnEnumAttribute()
                 matAttr = om.MFnMatrixAttribute()
+                uAttr = om.MFnUnitAttribute()
 
                 cls.shapeAttr = enumAttr.create('shape', 'sh', 0)
                 for idx, shape in enumerate(shapes):
@@ -173,16 +186,29 @@ class zRigHandle(om.MPxSurfaceShape):
                 cls.addAttribute(cls.shapeAttr)
 
                 cls.transformAttr = matAttr.create('transform', 't', om.MFnMatrixAttribute.kFloat)
+                matAttr.keyable = False
                 cls.addAttribute(cls.transformAttr)
 
-                scaleX = nAttr.create('sizeX', 'sx', om.MFnNumericData.kFloat, 1)
-                scaleY = nAttr.create('sizeY', 'sy', om.MFnNumericData.kFloat, 1)
-                scaleZ = nAttr.create('sizeZ', 'sz', om.MFnNumericData.kFloat, 1)
-
-                cls.scaleAttr = nAttr.create('scale', 's', scaleX, scaleY, scaleZ)
+                localRotateX = uAttr.create('localRotateX', 'lrx', om.MFnUnitAttribute.kAngle, 0.0)
+                localRotateY = uAttr.create('localRotateY', 'lry', om.MFnUnitAttribute.kAngle, 0.0)
+                localRotateZ = uAttr.create('localRotateZ', 'lrz', om.MFnUnitAttribute.kAngle, 0.0)
+                cls.localRotateAttr = nAttr.create('localRotate', 'lr', localRotateX, localRotateY, localRotateZ)
                 nAttr.channelBox = True
-                nAttr.keyable = True
-                cls.addAttribute(cls.scaleAttr)
+                nAttr.keyable = False
+                cls.addAttribute(cls.localRotateAttr)
+
+                cls.localTranslateAttr = nAttr.createPoint('localPosition', 'lp')
+                nAttr.channelBox = True
+                nAttr.keyable = False
+                cls.addAttribute(cls.localTranslateAttr)
+
+                localScaleX = nAttr.create('localScaleX', 'lsx', om.MFnNumericData.kFloat, 1)
+                localScaleY = nAttr.create('localScaleY', 'lsy', om.MFnNumericData.kFloat, 1)
+                localScaleZ = nAttr.create('localScaleZ', 'lsz', om.MFnNumericData.kFloat, 1)
+                cls.localScaleAttr = nAttr.create('localScale', 'ls', localScaleX, localScaleY, localScaleZ)
+                nAttr.channelBox = True
+                nAttr.keyable = False
+                cls.addAttribute(cls.localScaleAttr)
 
                 cls.colorAttr = nAttr.createColor('color', 'dc')
                 nAttr.default = (.38,0,0.02)
@@ -191,6 +217,7 @@ class zRigHandle(om.MPxSurfaceShape):
                 cls.alphaAttr = nAttr.create('alpha', 'a', om.MFnNumericData.kFloat, 0.333)
                 nAttr.setSoftMin(0)
                 nAttr.setSoftMax(1)
+                nAttr.keyable = False
                 cls.addAttribute(cls.alphaAttr)
 
         def postConstructor(self):
@@ -200,7 +227,7 @@ class zRigHandle(om.MPxSurfaceShape):
                 if plug.isChild:
                     plug = plug.parent()
 
-                if plug in (zRigHandle.transformAttr, zRigHandle.shapeAttr, zRigHandle.scaleAttr,
+                if plug in (zRigHandle.transformAttr, zRigHandle.shapeAttr, zRigHandle.localScaleAttr,
                     zRigHandle.colorAttr, zRigHandle.alphaAttr):
                     self.childChanged(self.kBoundingBoxChanged)
                     omr.MRenderer.setGeometryDrawDirty(self.thisMObject(), False)

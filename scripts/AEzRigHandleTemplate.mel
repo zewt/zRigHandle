@@ -3,10 +3,11 @@ global proc AEzRigHandleTemplate(string $nodeName)
     editorTemplate -beginScrollLayout;
     editorTemplate -beginLayout "Attributes" -collapse false;
     editorTemplate -label "Shape" -addControl "shape";
-    editorTemplate -label "Scale" -addControl "scale";
-    editorTemplate -label "Size" -addControl "size";
     editorTemplate -label "Color" -addControl "color";
     editorTemplate -label "Alpha" -addControl "alpha";
+    editorTemplate -label "Local Position" -addControl "localPosition";
+    editorTemplate -label "Local Rotation" -addControl "localRotate";
+    editorTemplate -label "Local Scale" -addControl "localScale";
     editorTemplate -endScrollLayout;
     editorTemplate -addExtraControls;
     editorTemplate -endScrollLayout;
