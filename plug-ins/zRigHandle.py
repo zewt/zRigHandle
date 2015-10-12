@@ -280,6 +280,11 @@ class zRigHandle(om.MPxSurfaceShape):
                 nAttr.keyable = False
                 cls.addAttribute(cls.alphaAttr)
 
+                cls.xrayAttr = nAttr.create('xray', 'xr', om.MFnNumericData.kBoolean, True)
+                nAttr.keyable = False
+                nAttr.channelBox = True
+                cls.addAttribute(cls.xrayAttr)
+
         def postConstructor(self):
                 self.isRenderable = True
 
@@ -292,7 +297,7 @@ class zRigHandle(om.MPxSurfaceShape):
                     if hasattr(self, 'transformedShape'): del self.transformedShape
 
                 if plug in (zRigHandle.transformAttr, zRigHandle.shapeAttr, zRigHandle.localScaleAttr,
-                    zRigHandle.colorAttr, zRigHandle.alphaAttr):
+                    zRigHandle.colorAttr, zRigHandle.alphaAttr, zRigHandle.xrayAttr):
                     self.childChanged(self.kBoundingBoxChanged)
                     omr.MRenderer.setGeometryDrawDirty(self.thisMObject(), False)
 
@@ -361,6 +366,10 @@ class zRigHandle(om.MPxSurfaceShape):
 
             return mat.asMatrix()
 
+        @property
+        def xray(self):
+            return om.MPlug(self.thisMObject(), zRigHandle.xrayAttr).asBool()
+
         def boundingBox(self):
             return getShapeBounds(self.getShape())
 
@@ -405,7 +414,10 @@ class zRigHandleShapeUI(omui.MPxSurfaceShapeUI):
             transformation = om.MTransformationMatrix(mat)
             pos = transformation.translation(om.MSpace.kWorld)
 
-            priorityMask = om.MSelectionMask(om.MSelectionMask.kSelectJoints)
+            if self.surfaceShape().xray:
+                priorityMask = om.MSelectionMask(om.MSelectionMask.kSelectJoints)
+            else:
+                priorityMask = om.MSelectionMask(om.MSelectionMask.kSelectLocators)
             selectInfo.addSelection(item, om.MPoint(pos), selectionList, worldSpaceSelectPts, priorityMask, False)
 
             return True
@@ -451,7 +463,11 @@ class zRigHandleDrawOverride(omr.MPxDrawOverride):
 		return True
 
 	def prepareForDraw(self, objPath, cameraPath, frameContext, oldData):
+                depNode = om.MFnDependencyNode(objPath.node())
+                obj = depNode.userNode()
+            
 		self.isSelected = isPathSelected(objPath)
+                self.xray = obj.xray
 
                 plug = om.MPlug(objPath.node(), zRigHandle.colorAttr)
                 self.color = om.MColor(om.MFnNumericData(plug.asMObject()).getData())
@@ -465,14 +481,14 @@ class zRigHandleDrawOverride(omr.MPxDrawOverride):
                     self.borderColor = om.MColor(self.color)
                     self.borderColor.a = 1
 
-                depNode = om.MFnDependencyNode(objPath.node())
-                self.shape = depNode.userNode().getShape()
+                self.shape = obj.getShape()
 
 	def hasUIDrawables(self):
 		return True
 
 	def addUIDrawables(self, objPath, drawManager, frameContext, data):
-                drawManager.beginDrawInXray()
+                if self.xray:
+                    drawManager.beginDrawInXray()
 
                 drawManager.beginDrawable()
 		for itemType, data in self.shape.items():
@@ -490,7 +506,8 @@ class zRigHandleDrawOverride(omr.MPxDrawOverride):
 
                 drawManager.endDrawable()
 
-                drawManager.endDrawInXray()
+                if self.xray:
+                    drawManager.beginDrawInXray()
 
 def initializePlugin(obj):
         plugin = om.MFnPlugin(obj)

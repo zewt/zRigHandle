@@ -5,6 +5,7 @@ global proc AEzRigHandleTemplate(string $nodeName)
     editorTemplate -label "Shape" -addControl "shape";
     editorTemplate -label "Color" -addControl "color";
     editorTemplate -label "Alpha" -addControl "alpha";
+    editorTemplate -label "Xray" -addControl "xray";
     editorTemplate -label "Local Position" -addControl "localPosition";
     editorTemplate -label "Local Rotation" -addControl "localRotate";
     editorTemplate -label "Local Scale" -addControl "localScale";
