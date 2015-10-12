@@ -1,5 +1,4 @@
-import sys
-import ctypes
+import math, sys
 import maya.api.OpenMaya as om
 import maya.api.OpenMayaUI as omui
 import maya.api.OpenMayaAnim as oma
@@ -21,17 +20,15 @@ def maya_useNewAPI():
 # Be careful when changing the order of these shapes.  Their index is the value of the .shape
 # enum, so this affects the file format.
 def _make_pyramid():
-    return [{
-        'type': 'quad',
-        'data': [
+    return {
+        'quads': [
             (-0.5, 0, +0.5),
             (+0.5, 0, +0.5),
             (+0.5, 0, -0.5),
             (-0.5, 0, -0.5),
         ],
-    }, {
-        'type': omr.MGeometry.kTriangles,
-        'data': [
+
+        omr.MUIDrawManager.kTriangles: [
             (-0.5, 0, +0.5),
             (-0.5, 0, -0.5),
             (+0.0, 1, -0.0),
@@ -48,7 +45,7 @@ def _make_pyramid():
             (-0.5, 0, +0.5),
             (+0.0, 1, -0.0),
         ]
-    }]
+    }
 
 def _make_ball():
     points = []
@@ -86,11 +83,6 @@ def _make_ball():
             points.append((x*+p1, y*+p2, +p2))
             points.append((x*+p1, y*+p2, -p2))
 
-    result = [{
-        'type': 'quad',
-        'data': points,
-    }]
-
     tris = []
     for x in (1, -1):
         for y in (1, -1):
@@ -99,12 +91,10 @@ def _make_ball():
                 tris.append((x*-p2, y*-p1, z*p2))
                 tris.append((x*-p2, y*-p2, z*p1))
     
-    result.append({
-        'type': omr.MGeometry.kTriangles,
-        'data': tris,
-    })
-
-    return result
+    return {
+        'quads': points,
+        omr.MUIDrawManager.kTriangles: tris,
+    }
 
 shapes = [{
     'name': 'Ball',
@@ -114,50 +104,113 @@ shapes = [{
     'geometry': _make_pyramid(),
 }]
 
-for shape in shapes:
-    for item in shape['geometry']:
-        item['data'] = [om.MPoint(*v) for v in item['data']]
+def _convert_shape(shape):
+    geometry = shape['geometry']
+    lines = geometry.setdefault(omr.MUIDrawManager.kLines, [])
+
+    # Add edge lines for quads.
+    if 'quads' in geometry:
+        quads = geometry['quads']
+        for i in xrange(0, len(quads), 4):
+            lines.append(quads[i+0])
+            lines.append(quads[i+1])
+            lines.append(quads[i+1])
+            lines.append(quads[i+2])
+            lines.append(quads[i+2])
+            lines.append(quads[i+3])
+            lines.append(quads[i+3])
+            lines.append(quads[i+0])
+
+    # Add edge lines for tris.
+    if omr.MUIDrawManager.kTriangles in geometry:
+        tris = geometry[omr.MUIDrawManager.kTriangles]
+        for i in xrange(0, len(tris), 3):
+            lines.append(tris[i+0])
+            lines.append(tris[i+1])
+            lines.append(tris[i+1])
+            lines.append(tris[i+2])
+            lines.append(tris[i+2])
+            lines.append(tris[i+0])
+
+    # Convert quads to tris.
+    if 'quads' in geometry:
+        tris = geometry.setdefault(omr.MUIDrawManager.kTriangles, [])
+        quads = geometry.pop('quads')
+
+        for i in xrange(0, len(quads), 4):
+            tris.append(quads[i+0])
+            tris.append(quads[i+1])
+            tris.append(quads[i+2])
+
+            tris.append(quads[i+2])
+            tris.append(quads[i+3])
+            tris.append(quads[i+0])
+    
+    for key, data in geometry.items():
+        array = om.MPointArray()
+        for point in data:
+            array.append(om.MPoint(*point))
+
+        geometry[key] = array
+
+    return shape
+
+shapes = [_convert_shape(shape) for shape in shapes]
+
+def _getCustomShape(node):
+    # Return the shape connected to customMeshAttr.
+    depNode = om.MFnDependencyNode(node)
+    obj = depNode.userNode()
+    dataBlock = obj.forceCache()
+    meshHandle = dataBlock.inputValue(zRigHandle.customMeshAttr)
+    try:
+        it = om.MItMeshPolygon(meshHandle.asMesh())
+    except RuntimeError:
+        # We'll get "kInvalidParameter: Argument is a NULL pointer" if there's no
+        # mesh connection.  How do we check this?
+        return shapes[0]['geometry']
+
+    tris = []
+    lines = []
+    while not it.isDone():
+        face = it.getPoints(om.MSpace.kObject)
+
+        # The data from the iterator doesn't stay valid, so make a copy of the point.
+        face = [om.MPoint(v) for v in face]
+
+        if len(face) == 3:
+            tris.extend(face)
+            lines.extend(face)
+        elif len(face) == 4:
+            tris.extend((face[0], face[1], face[2], face[2], face[3], face[0]))
+            lines.extend((face[0], face[1], face[1], face[2], face[2], face[3], face[3], face[0]))
+        else:
+            # We don't currently support meshes with more than four faces.  We could
+            # triangulate with MFnMesh.polyTriangulate, but I'm not sure it's worth
+            # the bother.
+            pass
+
+        it.next(1)
+
+    return {
+        omr.MUIDrawManager.kTriangles: tris,
+        omr.MUIDrawManager.kLines: lines,
+    }
 
 def getShapeBounds(shape):
     boundingBox = om.MBoundingBox()
-    for item in shape:
-        for point in item['data']:
+    for item in shape.values():
+        for point in item:
             boundingBox.expand(point)
 
     return boundingBox
 
 def _transformShape(shape, transform):
-    result = []
-    for item in shape:
-        transformed = {key: value for key, value in item.items()}
-        result.append(transformed)
-        transformed['data'] = [v*transform for v in transformed['data']]
+    result = {}
+    for key, data in shape.items():
+        result[key] = om.MPointArray([v*transform for v in data])
 
     return result
-
-def _getTransform(node):
-    transformPlug = om.MPlug(node, zRigHandle.transformAttr)
-    transform = om.MFnMatrixData(transformPlug.asMObject()).matrix()
-
-    mat = om.MTransformationMatrix(transform)
-
-    # Apply local translation.
-    localTranslatePlug = om.MPlug(node, zRigHandle.localTranslateAttr)
-    localTranslation = om.MVector(*[localTranslatePlug.child(idx).asFloat() for idx in range(3)])
-    mat.translateBy(localTranslation, om.MSpace.kObject)
-
-    # Apply local rotation.
-    localRotatePlug = om.MPlug(node, zRigHandle.localRotateAttr)
-    localRotatePlugs = [localRotatePlug.child(idx) for idx in range(3)]
-    localRotate = om.MVector(*[localRotatePlugs[idx].asMAngle().asRadians() for idx in range(3)])
-    mat.rotateBy(om.MEulerRotation(localRotate), om.MSpace.kObject)
-
-    # Apply local scale.
-    scalePlug = om.MPlug(node, zRigHandle.localScaleAttr)
-    scale = om.MFnNumericData(scalePlug.asMObject()).getData()
-    mat.scaleBy(scale, om.MSpace.kObject)
-
-    return mat.asMatrix()
 
 class zRigHandle(om.MPxSurfaceShape):
         id = om.MTypeId(0x124743)
@@ -177,13 +230,20 @@ class zRigHandle(om.MPxSurfaceShape):
                 enumAttr = om.MFnEnumAttribute()
                 matAttr = om.MFnMatrixAttribute()
                 uAttr = om.MFnUnitAttribute()
+                typedAttr = om.MFnTypedAttribute()
 
                 cls.shapeAttr = enumAttr.create('shape', 'sh', 0)
+                enumAttr.addField('Custom', -1)
                 for idx, shape in enumerate(shapes):
                     enumAttr.addField(shape['name'], idx)
                 enumAttr.channelBox = True
-
                 cls.addAttribute(cls.shapeAttr)
+
+                cls.customMeshAttr = typedAttr.create("inCustomMesh", "icm", om.MFnMeshData.kMesh)
+                typedAttr.storable = False
+                # The kReset constant is missing from the Python 2.0 API.
+                typedAttr.disconnectBehavior = 1
+                cls.addAttribute(cls.customMeshAttr)
 
                 cls.transformAttr = matAttr.create('transform', 't', om.MFnMatrixAttribute.kFloat)
                 matAttr.keyable = False
@@ -227,46 +287,87 @@ class zRigHandle(om.MPxSurfaceShape):
                 if plug.isChild:
                     plug = plug.parent()
 
+                if plug in (zRigHandle.transformAttr, zRigHandle.localTranslateAttr, zRigHandle.localRotateAttr, zRigHandle.localScaleAttr):
+                    # Discard our transformed shape.
+                    if hasattr(self, 'transformedShape'): del self.transformedShape
+
                 if plug in (zRigHandle.transformAttr, zRigHandle.shapeAttr, zRigHandle.localScaleAttr,
                     zRigHandle.colorAttr, zRigHandle.alphaAttr):
                     self.childChanged(self.kBoundingBoxChanged)
                     omr.MRenderer.setGeometryDrawDirty(self.thisMObject(), False)
 
+                if plug in (zRigHandle.shapeAttr, zRigHandle.customMeshAttr):
+                    # Discard our shape cache.  We can't set the new one now, since the new
+                    # plug value hasn't actually been set yet, so we'll do it on the next
+                    # render.
+                    if hasattr(self, 'transformedShape'): del self.transformedShape
+                    if hasattr(self, 'shape'): del self.shape
+
+                    self.childChanged(self.kBoundingBoxChanged)
+
                 return super(zRigHandle, self).setDependentsDirty(plug, affectedPlugs)
 
-
         def isBounded(self):
-                return True
+            return True
+
+        def getShapeIdx(self):
+            return om.MPlug(self.thisMObject(), zRigHandle.shapeAttr).asInt()
+            
+	def getShape(self):
+            # If the shape isn't cached, cache it now.
+            if not hasattr(self, 'shape'):
+                self.shape = self._getShapeFromPlug()
+
+            if not hasattr(self, 'transformedShape'):
+                shape = self.shape
+
+                transform = self._getLocalTransform()
+                self.transformedShape = _transformShape(shape, transform)
+
+            return self.transformedShape
+
+	def _getShapeFromPlug(self):
+            idx = self.getShapeIdx()
+            if idx == -1:
+                shape = _getCustomShape(self.thisMObject())
+            else:
+                shape = shapes[idx]['geometry']
+
+            return shape
+
+        def _getLocalTransform(self):
+            node = self.thisMObject()
+
+            transformPlug = om.MPlug(node, zRigHandle.transformAttr)
+            transform = om.MFnMatrixData(transformPlug.asMObject()).matrix()
+
+            mat = om.MTransformationMatrix(transform)
+
+            # Apply local translation.
+            localTranslatePlug = om.MPlug(node, zRigHandle.localTranslateAttr)
+            localTranslation = om.MVector(*[localTranslatePlug.child(idx).asFloat() for idx in range(3)])
+            mat.translateBy(localTranslation, om.MSpace.kObject)
+
+            # Apply local rotation.
+            localRotatePlug = om.MPlug(node, zRigHandle.localRotateAttr)
+            localRotatePlugs = [localRotatePlug.child(idx) for idx in range(3)]
+            localRotate = om.MVector(*[localRotatePlugs[idx].asMAngle().asRadians() for idx in range(3)])
+            mat.rotateBy(om.MEulerRotation(localRotate), om.MSpace.kObject)
+
+            # Apply local scale.
+            scalePlug = om.MPlug(node, zRigHandle.localScaleAttr)
+            scale = om.MFnNumericData(scalePlug.asMObject()).getData()
+            mat.scaleBy(scale, om.MSpace.kObject)
+
+            return mat.asMatrix()
 
         def boundingBox(self):
-                transform = _getTransform(self.thisMObject())
-            
-                shapeIdx = om.MPlug(self.thisMObject(), zRigHandle.shapeAttr).asInt()
-                shape = shapes[shapeIdx]['geometry']
-                
-                bounds = getShapeBounds(shape)
-                bounds.transformUsing(transform)
-                return bounds
+            return getShapeBounds(self.getShape())
 
 def _hitTestShape(view, shape):
     # Hit test shape within view.
-    for part in shape:
+    for itemType, data in shape.items():
         view.beginSelect()
-
-        data = part['data']
-        itemType = part['type']
-        if itemType == 'quad':
-            itemType = omr.MGeometry.kTriangles
-            tris = []
-            for i in xrange(0, len(data), 4):
-                tris.append(data[i+0])
-                tris.append(data[i+1])
-                tris.append(data[i+2])
-
-                tris.append(data[i+2])
-                tris.append(data[i+3])
-                tris.append(data[i+0])
-            data = tris
 
         glFT.glBegin(v1omr.MGL_TRIANGLES)
         for v in data:
@@ -289,10 +390,7 @@ class zRigHandleShapeUI(omui.MPxSurfaceShapeUI):
                 return zRigHandleShapeUI()
 
         def select(self, selectInfo, selectionList, worldSpaceSelectPts):
-            transform = _getTransform(self.surfaceShape().thisMObject())
-
-            shapeIdx = om.MPlug(self.surfaceShape().thisMObject(), zRigHandle.shapeAttr).asInt()
-            shape = _transformShape(shapes[shapeIdx]['geometry'], transform)
+            shape = self.surfaceShape().getShape()
 
             # Hit test the selection against the shape.
             if not _hitTestShape(selectInfo.view(), shape):
@@ -345,8 +443,9 @@ class zRigHandleDrawOverride(omr.MPxDrawOverride):
 		return True
 
 	def boundingBox(self, objPath, cameraPath):
-		shape = self.getShape(objPath, _getTransform(objPath.node()))
-                return getShapeBounds(shape)
+                depNode = om.MFnDependencyNode(objPath.node())
+                obj = depNode.userNode()
+                return obj.boundingBox()
 
 	def disableInternalBoundingBoxDraw(self):
 		return True
@@ -366,8 +465,8 @@ class zRigHandleDrawOverride(omr.MPxDrawOverride):
                     self.borderColor = om.MColor(self.color)
                     self.borderColor.a = 1
 
-                transform = _getTransform(objPath.node())
-		self.shape = self.getShape(objPath, transform)
+                depNode = om.MFnDependencyNode(objPath.node())
+                self.shape = depNode.userNode().getShape()
 
 	def hasUIDrawables(self):
 		return True
@@ -375,72 +474,23 @@ class zRigHandleDrawOverride(omr.MPxDrawOverride):
 	def addUIDrawables(self, objPath, drawManager, frameContext, data):
                 drawManager.beginDrawInXray()
 
-		for item in self.shape:
-                    drawManager.beginDrawable()
+                drawManager.beginDrawable()
+		for itemType, data in self.shape.items():
+                    if itemType == omr.MUIDrawManager.kLines:
+                        # X-ray only
+                        continue
+                    
                     drawManager.setColor(self.color)
-
-                    data = om.MPointArray()
-                    for point in item['data']:
-			data.append(point)
-                    itemType = item['type']
-                    if itemType == 'quad':
-                        itemType = omr.MGeometry.kTriangles
-                        tris = om.MPointArray()
-                        for i in xrange(0, len(data), 4):
-                            tris.append( data[i+0] )
-                            tris.append( data[i+1] )
-                            tris.append( data[i+2] )
-
-                            tris.append( data[i+2] )
-                            tris.append( data[i+3] )
-                            tris.append( data[i+0] )
-                        data = tris
-
                     drawManager.mesh(itemType, data)
 
-                    drawManager.endDrawable()
-
-                # XXX: This will overdraw overlapping lines, which will reduce antialiasing
-                # quality.
-                for item in self.shape:
-                    drawManager.beginDrawable()
+                lines = self.shape.get(omr.MUIDrawManager.kLines)
+                if lines:
                     drawManager.setColor(self.borderColor)
+                    drawManager.mesh(omr.MUIDrawManager.kLines, lines)
 
-                    data = om.MPointArray()
-
-                    points = item['data']
-                    if item['type'] == 'quad':
-                        for i in xrange(0, len(points), 4):
-                            data.append(points[i+0])
-                            data.append(points[i+1])
-                            data.append(points[i+1])
-                            data.append(points[i+2])
-                            data.append(points[i+2])
-                            data.append(points[i+3])
-                            data.append(points[i+3])
-                            data.append(points[i+0])
-                    else:
-                        for idx in xrange(0, len(points), 3):
-                            data.append(points[idx+0])
-                            data.append(points[idx+1])
-
-                            data.append(points[idx+1])
-                            data.append(points[idx+2])
-
-                            data.append(points[idx+2])
-                            data.append(points[idx+0])
-
-                    drawManager.mesh(omr.MUIDrawManager.kLines, data)
-                    drawManager.endDrawable()
+                drawManager.endDrawable()
 
                 drawManager.endDrawInXray()
-
-	def getShape(self, objPath, transform):
-            idx = self.getShapeIdx(objPath)
-            return _transformShape(shapes[idx]['geometry'], transform)
-
-	def getShapeIdx(self, objPath):
-            return om.MPlug(objPath.node(), zRigHandle.shapeAttr).asInt()
 
 def initializePlugin(obj):
         plugin = om.MFnPlugin(obj)
