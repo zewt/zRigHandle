@@ -283,6 +283,9 @@ class zRigHandle(om.MPxSurfaceShape):
         def postConstructor(self):
                 self.isRenderable = True
 
+                depNode = om.MFnDependencyNode(self.thisMObject())
+                depNode.setName("rigHandleShape#");
+
         def setDependentsDirty(self, plug, affectedPlugs):
                 if plug.isChild:
                     plug = plug.parent()
