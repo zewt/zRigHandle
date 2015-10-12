@@ -10,12 +10,7 @@ import maya.OpenMayaRender as v1omr
 glRenderer = v1omr.MHardwareRenderer.theRenderer()
 glFT = glRenderer.glFunctionTable()
 
-def maya_useNewAPI():
-        """
-        The presence of this function tells Maya that the plugin produces, and
-        expects to be passed, objects created using the Maya Python API 2.0.
-        """
-        pass
+def maya_useNewAPI(): pass
 
 # Be careful when changing the order of these shapes.  Their index is the value of the .shape
 # enum, so this affects the file format.
