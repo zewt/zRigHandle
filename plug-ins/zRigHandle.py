@@ -412,10 +412,7 @@ class zRigHandleShapeUI(omui.MPxSurfaceShapeUI):
             transformation = om.MTransformationMatrix(mat)
             pos = transformation.translation(om.MSpace.kWorld)
 
-            if self.surfaceShape().xray:
-                priorityMask = om.MSelectionMask(om.MSelectionMask.kSelectJoints)
-            else:
-                priorityMask = om.MSelectionMask(om.MSelectionMask.kSelectLocators)
+            priorityMask = om.MSelectionMask(om.MSelectionMask.kSelectJoints)
             selectInfo.addSelection(item, om.MPoint(pos), selectionList, worldSpaceSelectPts, priorityMask, False)
 
             return True
