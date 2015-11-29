@@ -6,6 +6,10 @@ import maya.mel as mel
 # you need to find third-party example code just to add items to it.
 menuItems = []
 def createMenuItems():
+    # Don't create menu items in batch mode.  It causes an annoying warning.
+    if cmds.about(batch=True):
+        return
+
     global menuItems
     if menuItems:
         return
