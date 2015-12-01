@@ -294,7 +294,8 @@ class zRigHandle(om.MPxSurfaceShape):
                     # Discard our transformed shape.
                     if hasattr(self, 'transformedShape'): del self.transformedShape
 
-                if plug in (zRigHandle.transformAttr, zRigHandle.shapeAttr, zRigHandle.localScaleAttr,
+                if plug in (zRigHandle.transformAttr, zRigHandle.shapeAttr,
+                    zRigHandle.localTranslateAttr, zRigHandle.localRotateAttr, zRigHandle.localScaleAttr,
                     zRigHandle.colorAttr, zRigHandle.alphaAttr, zRigHandle.xrayAttr):
                     self.childChanged(self.kBoundingBoxChanged)
                     omr.MRenderer.setGeometryDrawDirty(self.thisMObject(), False)
