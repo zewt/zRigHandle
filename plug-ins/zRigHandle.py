@@ -312,7 +312,13 @@ class zRigHandle(om.MPxSurfaceShape):
                 return super(zRigHandle, self).setDependentsDirty(plug, affectedPlugs)
 
         def getShapeSelectionMask(self):
-                return om.MSelectionMask(om.MSelectionMask.kSelectJoints)
+            # Set both kSelectMeshes, so tumble on pivot sees the object, and kSelectJoints, so we're
+            # higher priority for selection than meshes that are in front of us.  Xray alone won't do
+            # this.
+            mask = om.MSelectionMask()
+            mask.addMask(om.MSelectionMask.kSelectMeshes)
+            mask.addMask(om.MSelectionMask.kSelectJoints)
+            return mask
 
         def isBounded(self):
             return True
@@ -392,7 +398,7 @@ def _hitTestShape(view, shape):
     return False
 
 
-# XXX: This isn't getting created in 2016.5, causing camera focus on selection to not work.
+# This object isn't created in 2016.5 VP2.
 class zRigHandleShapeUI(omui.MPxSurfaceShapeUI):
         def __init__(self):
                 omui.MPxSurfaceShapeUI.__init__(self)
