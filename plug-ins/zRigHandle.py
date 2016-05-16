@@ -507,7 +507,7 @@ class zRigHandleDrawOverride(omr.MPxDrawOverride):
                 drawManager.endDrawable()
 
                 if self.xray:
-                    drawManager.beginDrawInXray()
+                    drawManager.endDrawInXray()
 
 def initializePlugin(obj):
         plugin = om.MFnPlugin(obj)
