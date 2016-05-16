@@ -392,7 +392,7 @@ def _hitTestShape(view, shape):
     return False
 
 
-# XXX: This isn't getting created in 2016 SP2, causing camera focus on selection to not work.
+# XXX: This isn't getting created in 2016.5, causing camera focus on selection to not work.
 class zRigHandleShapeUI(omui.MPxSurfaceShapeUI):
         def __init__(self):
                 omui.MPxSurfaceShapeUI.__init__(self)
