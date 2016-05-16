@@ -311,6 +311,9 @@ class zRigHandle(om.MPxSurfaceShape):
 
                 return super(zRigHandle, self).setDependentsDirty(plug, affectedPlugs)
 
+        def getShapeSelectionMask(self):
+                return om.MSelectionMask(om.MSelectionMask.kSelectJoints)
+
         def isBounded(self):
             return True
 
@@ -389,6 +392,7 @@ def _hitTestShape(view, shape):
     return False
 
 
+# XXX: This isn't getting created in 2016 SP2, causing camera focus on selection to not work.
 class zRigHandleShapeUI(omui.MPxSurfaceShapeUI):
         def __init__(self):
                 omui.MPxSurfaceShapeUI.__init__(self)
