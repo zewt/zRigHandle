@@ -275,6 +275,16 @@ class zRigHandle(om.MPxSurfaceShape):
                 nAttr.keyable = False
                 cls.addAttribute(cls.alphaAttr)
 
+                cls.borderColorAttr = nAttr.createColor('borderColor', 'bc')
+                nAttr.default = (-1,-1,-1)
+                cls.addAttribute(cls.borderColorAttr)
+
+                cls.borderAlphaAttr = nAttr.create('borderAlpha', 'ba', om.MFnNumericData.kFloat, 1)
+                nAttr.setSoftMin(0)
+                nAttr.setSoftMax(1)
+                nAttr.keyable = False
+                cls.addAttribute(cls.borderAlphaAttr)
+
                 cls.xrayAttr = nAttr.create('xray', 'xr', om.MFnNumericData.kBoolean, True)
                 nAttr.keyable = False
                 nAttr.channelBox = True
@@ -296,7 +306,8 @@ class zRigHandle(om.MPxSurfaceShape):
 
                 if plug in (zRigHandle.transformAttr, zRigHandle.shapeAttr,
                     zRigHandle.localTranslateAttr, zRigHandle.localRotateAttr, zRigHandle.localScaleAttr,
-                    zRigHandle.colorAttr, zRigHandle.alphaAttr, zRigHandle.xrayAttr):
+                    zRigHandle.colorAttr, zRigHandle.alphaAttr, zRigHandle.borderColorAttr, zRigHandle.borderAlphaAttr,
+                    zRigHandle.xrayAttr):
                     self.childChanged(self.kBoundingBoxChanged)
                     omr.MRenderer.setGeometryDrawDirty(self.thisMObject(), False)
 
@@ -484,8 +495,15 @@ class zRigHandleDrawOverride(omr.MPxDrawOverride):
                 if self.isSelected:
                     self.borderColor = omr.MGeometryUtilities.wireframeColor(objPath)
                 else:
-                    self.borderColor = om.MColor(self.color)
-                    self.borderColor.a = 1
+                    plug = om.MPlug(objPath.node(), zRigHandle.borderColorAttr)
+                    self.borderColor = om.MColor(om.MFnNumericData(plug.asMObject()).getData())
+
+                    # If no color has been set and we're on the default of (-1,-1,-1), use the main color,
+                    # so in the common case where you want to use the same color you don't have to set both.
+                    if self.borderColor.r == -1 and self.borderColor.g == -1 and self.borderColor.b == -1:
+                        self.borderColor = om.MColor(self.color)
+
+                    self.borderColor.a = om.MPlug(objPath.node(), zRigHandle.borderAlphaAttr).asFloat()
 
                 self.shape = obj.getShape()
 
