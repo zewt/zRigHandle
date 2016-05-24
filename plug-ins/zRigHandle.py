@@ -441,15 +441,13 @@ class zRigHandleShapeUI(omui.MPxSurfaceShapeUI):
 
 
 def isPathSelected(objPath):
-        sel1 = om.MSelectionList()
-        sel1.add(objPath)
-        path = sel1.getDagPath(0)
         sel = om.MGlobal.getActiveSelectionList()
-        if sel.hasItem(path):
+        if sel.hasItem(objPath):
             return True
 
-        path.pop()
-        if sel.hasItem(path):
+        objPath = om.MDagPath(objPath)
+        objPath.pop()
+        if sel.hasItem(objPath):
             return True
         return False
 
@@ -483,7 +481,7 @@ class zRigHandleDrawOverride(omr.MPxDrawOverride):
                 depNode = om.MFnDependencyNode(objPath.node())
                 obj = depNode.userNode()
             
-		self.isSelected = isPathSelected(objPath)
+		isSelected = isPathSelected(objPath)
                 self.xray = obj.xray
 
                 plug = om.MPlug(objPath.node(), zRigHandle.colorAttr)
@@ -492,7 +490,7 @@ class zRigHandleDrawOverride(omr.MPxDrawOverride):
                 alpha = om.MPlug(objPath.node(), zRigHandle.alphaAttr).asFloat()
                 self.color.a = alpha
 
-                if self.isSelected:
+                if isSelected:
                     self.borderColor = omr.MGeometryUtilities.wireframeColor(objPath)
                 else:
                     plug = om.MPlug(objPath.node(), zRigHandle.borderColorAttr)
