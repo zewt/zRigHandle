@@ -3,6 +3,7 @@ import maya.api.OpenMaya as om
 import maya.api.OpenMayaUI as omui
 import maya.api.OpenMayaAnim as oma
 import maya.api.OpenMayaRender as omr
+from maya.OpenMaya import MGlobal
 
 # This is insane.  There are two Python APIs in Maya, and both of them are missing lots of
 # stuff, and you can't mix them except in specific careful ways.
@@ -461,7 +462,11 @@ class zRigHandleDrawOverride(omr.MPxDrawOverride):
 		return
 
 	def __init__(self, obj):
-		omr.MPxDrawOverride.__init__(self, obj, zRigHandleDrawOverride.draw)
+                args = [self, obj, zRigHandleDrawOverride.draw]
+                if MGlobal.apiVersion() >= 201700:
+                    # This argument is only present in 2017, and improves performance substantially.
+                    args.append(False)
+		omr.MPxDrawOverride.__init__(*args)
 
 	def supportedDrawAPIs(self):
 		return omr.MRenderer.kOpenGL | omr.MRenderer.kDirectX11 | omr.MRenderer.kOpenGLCoreProfile
