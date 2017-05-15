@@ -310,7 +310,7 @@ class zRigHandle(om.MPxSurfaceShape):
                     zRigHandle.colorAttr, zRigHandle.alphaAttr, zRigHandle.borderColorAttr, zRigHandle.borderAlphaAttr,
                     zRigHandle.xrayAttr):
                     self.childChanged(self.kBoundingBoxChanged)
-                    omr.MRenderer.setGeometryDrawDirty(self.thisMObject(), False)
+                    omr.MRenderer.setGeometryDrawDirty(self.thisMObject(), True)
 
                 if plug in (zRigHandle.shapeAttr, zRigHandle.customMeshAttr):
                     # Discard our shape cache.  We can't set the new one now, since the new
