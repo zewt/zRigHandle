@@ -301,18 +301,18 @@ class zRigHandle(om.MPxSurfaceShape):
                 if plug.isChild:
                     plug = plug.parent()
 
-                if plug in (zRigHandle.transformAttr, zRigHandle.localTranslateAttr, zRigHandle.localRotateAttr, zRigHandle.localScaleAttr):
+                if plug in (self.transformAttr, self.localTranslateAttr, self.localRotateAttr, self.localScaleAttr):
                     # Discard our transformed shape.
                     if hasattr(self, 'transformedShape'): del self.transformedShape
 
-                if plug in (zRigHandle.transformAttr, zRigHandle.shapeAttr,
-                    zRigHandle.localTranslateAttr, zRigHandle.localRotateAttr, zRigHandle.localScaleAttr,
-                    zRigHandle.colorAttr, zRigHandle.alphaAttr, zRigHandle.borderColorAttr, zRigHandle.borderAlphaAttr,
-                    zRigHandle.xrayAttr):
+                if plug in (self.transformAttr, self.shapeAttr,
+                    self.localTranslateAttr, self.localRotateAttr, self.localScaleAttr,
+                    self.colorAttr, self.alphaAttr, self.borderColorAttr, self.borderAlphaAttr,
+                    self.xrayAttr):
                     self.childChanged(self.kBoundingBoxChanged)
                     omr.MRenderer.setGeometryDrawDirty(self.thisMObject(), True)
 
-                if plug in (zRigHandle.shapeAttr, zRigHandle.customMeshAttr):
+                if plug in (self.shapeAttr, self.customMeshAttr):
                     # Discard our shape cache.  We can't set the new one now, since the new
                     # plug value hasn't actually been set yet, so we'll do it on the next
                     # render.
@@ -336,7 +336,7 @@ class zRigHandle(om.MPxSurfaceShape):
             return True
 
         def getShapeIdx(self):
-            return om.MPlug(self.thisMObject(), zRigHandle.shapeAttr).asInt()
+            return om.MPlug(self.thisMObject(), self.shapeAttr).asInt()
             
 	def getShape(self):
             # If the shape isn't cached, cache it now.
@@ -363,24 +363,24 @@ class zRigHandle(om.MPxSurfaceShape):
         def _getLocalTransform(self):
             node = self.thisMObject()
 
-            transformPlug = om.MPlug(node, zRigHandle.transformAttr)
+            transformPlug = om.MPlug(node, self.transformAttr)
             transform = om.MFnMatrixData(transformPlug.asMObject()).matrix()
 
             mat = om.MTransformationMatrix(transform)
 
             # Apply local translation.
-            localTranslatePlug = om.MPlug(node, zRigHandle.localTranslateAttr)
+            localTranslatePlug = om.MPlug(node, self.localTranslateAttr)
             localTranslation = om.MVector(*[localTranslatePlug.child(idx).asFloat() for idx in range(3)])
             mat.translateBy(localTranslation, om.MSpace.kObject)
 
             # Apply local rotation.
-            localRotatePlug = om.MPlug(node, zRigHandle.localRotateAttr)
+            localRotatePlug = om.MPlug(node, self.localRotateAttr)
             localRotatePlugs = [localRotatePlug.child(idx) for idx in range(3)]
             localRotate = om.MVector(*[localRotatePlugs[idx].asMAngle().asRadians() for idx in range(3)])
             mat.rotateBy(om.MEulerRotation(localRotate), om.MSpace.kObject)
 
             # Apply local scale.
-            scalePlug = om.MPlug(node, zRigHandle.localScaleAttr)
+            scalePlug = om.MPlug(node, self.localScaleAttr)
             scale = om.MFnNumericData(scalePlug.asMObject()).getData()
             mat.scaleBy(scale, om.MSpace.kObject)
 
@@ -388,7 +388,7 @@ class zRigHandle(om.MPxSurfaceShape):
 
         @property
         def xray(self):
-            return om.MPlug(self.thisMObject(), zRigHandle.xrayAttr).asBool()
+            return om.MPlug(self.thisMObject(), self.xrayAttr).asBool()
 
         def boundingBox(self):
             return getShapeBounds(self.getShape())
